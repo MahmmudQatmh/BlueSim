@@ -15,24 +15,34 @@ __pycache__/
 # VSCode
 # ===========================
 .vscode/
+*.code-workspace
 
 # ===========================
 # Linux
 # ===========================
 *~
 *.swp
+.cache/
 
 # ===========================
 # Unreal Engine
 # ===========================
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
 
-# Visual Studio
-.vs/
+**/Binaries/
+**/DerivedDataCache/
+**/Intermediate/
+**/Saved/
 
+*.opensdf
+*.sdf
+*.suo
+*.VC.db
+
+**/.ignore
+*.tmp
+
+# ==========================
 # CMake
-CMakeFiles/
-CMakeCache.txt
+# ==========================
+compile_commands.json
+
