@@ -11,7 +11,8 @@ install(
     bluesim_ros2/rover_command.py
     bluesim_ros2/boat_command.py
     bluesim_ros2/drone_command.py
-    bluesim_ros2/blueboat_experiment.py 
+    bluesim_ros2/blueboat_experiment.py
+    bluesim_ros2/multi_robot_experiment.py 
   DESTINATION lib/${PROJECT_NAME}
 )
 
