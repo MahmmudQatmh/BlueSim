@@ -18,15 +18,7 @@
 The following video provides an overview of the BlueSim simulation environment, including the simulated **BlueBoat, Drone, and Rover**.
 
 <p align="center">
-  <video
-    src="./ros2_ws/Recorded%20Videos/BlueSim_Showcase.mp4"
-    controls
-    autoplay
-    muted
-    loop
-    playsinline
-    width="100%">
-  </video>
+  <img src="./ros2_ws/Recorded%20Videos/BlueSim_Showcase.gif" alt="BlueSim Showcase" width="100%">
 </p>
 
 > **BlueSim Showcase — Unreal Engine 5.4.4**
