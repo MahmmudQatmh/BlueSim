@@ -73,13 +73,13 @@ FORWARD / BACKWARD
 Current Unreal Rover convention:
 
     ROS linear.x = -1.0
-        → Move FORWARD
+         Move FORWARD
 
     ROS linear.x = +1.0
-        → Move BACKWARD
+         Move BACKWARD
 
     ROS linear.x = 0.0
-        → No forward/backward command
+         No forward/backward command
 
 
 Why?
@@ -87,18 +87,18 @@ Why?
 The current Unreal Rover movement system uses the local Y axis:
 
     Local Y = -1
-        → Forward
+         Forward
 
     Local Y = +1
-        → Backward
+         Backward
 
 Therefore this ROS interface currently uses:
 
     linear.x = -1
-        → Forward
+         Forward
 
     linear.x = +1
-        → Backward
+         Backward
 
 
 -----------------------------------------------------------------------------
@@ -108,13 +108,13 @@ LEFT / RIGHT STEERING
 Current Unreal Rover steering convention:
 
     ROS angular.z = -1.0
-        → Turn RIGHT
+         Turn RIGHT
 
     ROS angular.z = +1.0
-        → Turn LEFT
+         Turn LEFT
 
     ROS angular.z = 0.0
-        → No steering command
+         No steering command
 
 
 IMPORTANT
@@ -159,16 +159,16 @@ Each command uses:
 Examples:
 
     ("forward", 10.0)
-        → Move forward for 10 seconds.
+         Move forward for 10 seconds.
 
     ("backward", 5.0)
-        → Move backward for 5 seconds.
+         Move backward for 5 seconds.
 
     ("turn_right", 5.0)
-        → Turn right for 5 seconds.
+         Turn right for 5 seconds.
 
     ("turn_left", 5.0)
-        → Turn left for 5 seconds.
+         Turn left for 5 seconds.
 
 
 ===============================================================================

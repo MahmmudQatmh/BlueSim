@@ -76,13 +76,13 @@ ALTITUDE
 ROS:
 
     linear.z = +1.0
-        → Increase altitude / move upward
+         Increase altitude / move upward
 
     linear.z = -1.0
-        → Decrease altitude / move downward
+         Decrease altitude / move downward
 
     linear.z = 0.0
-        → No vertical command
+         No vertical command
 
 
 -----------------------------------------------------------------------------
@@ -95,22 +95,22 @@ Y axis.
 For the current Unreal implementation:
 
     Local Y = -1
-        → Forward
+         Forward
 
     Local Y = +1
-        → Backward
+         Backward
 
 
 The ROS 2 interface used by the current Drone implementation therefore sends:
 
     linear.y = -1.0
-        → Forward
+         Forward
 
     linear.y = +1.0
-        → Backward
+         Backward
 
     linear.y = 0.0
-        → No forward/backward command
+         No forward/backward command
 
 
 IMPORTANT:
@@ -126,13 +126,13 @@ YAW
 For the current Unreal Drone:
 
     angular.z = +1.0
-        → Yaw RIGHT
+         Yaw RIGHT
 
     angular.z = -1.0
-        → Yaw LEFT
+         Yaw LEFT
 
     angular.z = 0.0
-        → No yaw command
+         No yaw command
 
 
 -----------------------------------------------------------------------------
@@ -198,13 +198,13 @@ Each command uses:
 Examples:
 
     ("forward", 10.0)
-        → Move forward for 10 seconds.
+         Move forward for 10 seconds.
 
     ("yaw_right", 2.0)
-        → Yaw right for 2 seconds.
+         Yaw right for 2 seconds.
 
     ("increase_altitude", 5.0)
-        → Increase altitude for 5 seconds.
+         Increase altitude for 5 seconds.
 
 
 ===============================================================================
@@ -446,16 +446,16 @@ CAMERA_TOPIC = "/camera_Drone"
 # These values correspond to the current Unreal Drone implementation.
 #
 # Altitude:
-#     +1 → increase altitude
-#     -1 → decrease altitude
+#     +1  increase altitude
+#     -1  decrease altitude
 #
 # Forward/backward:
-#     linear.y = -1 → forward
-#     linear.y = +1 → backward
+#     linear.y = -1  forward
+#     linear.y = +1  backward
 #
 # Yaw:
-#     +1 → right
-#     -1 → left
+#     +1  right
+#     -1  left
 #
 # These are control values, not guaranteed physical units.
 

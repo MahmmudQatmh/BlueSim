@@ -15,18 +15,26 @@
 
 # 🎥 BlueSim Simulation Overview
 
-The following video provides an overview of the BlueSim simulation environment and its currently implemented robotic platforms.
+The following video provides an overview of the BlueSim simulation environment, including the simulated **BlueBoat, Drone, and Rover**.
 
 <p align="center">
-
-> **Simulation Overview:** [`BlueSim_Overview.mp4`](./ros2_ws/Recorded%20Videos/BlueSim_Overview.mp4)
-
+  <video
+    src="./ros2_ws/Recorded%20Videos/BlueSim_Showcase.mp4"
+    controls
+    autoplay
+    muted
+    loop
+    playsinline
+    width="100%">
+  </video>
 </p>
 
-The overview recording is stored in:
+> **BlueSim Showcase — Unreal Engine 5.4.4**
+
+The showcase video is stored in:
 
 ```text
-ros2_ws/Recorded Videos/
+ros2_ws/Recorded Videos/BlueSim_Showcase.mp4
 ```
 
 Additional experimental recordings from the simulated robot cameras are also stored in this directory.

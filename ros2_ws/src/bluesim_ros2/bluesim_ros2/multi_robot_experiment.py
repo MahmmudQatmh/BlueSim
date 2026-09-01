@@ -10,10 +10,21 @@ PURPOSE
 This script controls the BlueSim BlueBoat, Drone, and Rover simultaneously
 through ROS 2 while recording their three onboard cameras into ONE video.
 
-The experiment is intentionally defined in a simple high-level form near the
-beginning of this file.
+The experiment is synchronized with the Unreal Engine Level Sequencer.
 
-A new user should normally only need to modify the three MISSION definitions.
+IMPORTANT:
+The Unreal cinematic sequence is configured to run for 800 seconds.
+
+This script therefore:
+
+    1. Starts the camera recording.
+    2. Keeps ALL robots stopped.
+    3. Waits for the 800-second Unreal cinematic sequence to finish.
+    4. Starts all three robot missions simultaneously.
+    5. Continues recording the three onboard cameras.
+    6. Stops all robots after the missions are complete.
+    7. Finalizes and saves the onboard-camera video.
+    8. Terminates automatically.
 
 ===============================================================================
 1. ROBOTS
@@ -206,20 +217,12 @@ Command format:
     ("command_name", duration_seconds)
 
 
-Example:
-
-    ("forward", 10.0)
-
-means:
-
-    Move forward for 10 seconds.
-
-
 ===============================================================================
 8. EXPERIMENT
 ===============================================================================
 
-All three missions start simultaneously.
+All three missions start simultaneously AFTER the Unreal Level Sequencer
+has completed.
 
 BLUEBOAT:
 
@@ -248,44 +251,85 @@ ROVER:
     Stop       for 1 second
 
 
-To create a different experiment, modify the MISSION lists below.
-
-
 ===============================================================================
-9. VIDEO RECORDING
+9. LEVEL SEQUENCER SYNCHRONIZATION
 ===============================================================================
 
-The script waits until all three cameras have produced at least one valid
-image.
+The Unreal Level Sequence is currently:
 
-Then:
+    Start = 0
+    End   = 800 seconds
 
-    All cameras valid
-          ↓
-    Start video recording
-          ↓
-    2-second pre-roll
-          ↓
-    Start all three robot missions simultaneously
-          ↓
-    Record all three cameras
-          ↓
-    All missions complete
-          ↓
-    1-second post-roll
-          ↓
+This script waits:
+
+    800 seconds
+
+before starting any robot movement.
+
+During those 800 seconds:
+
+    BlueBoat = STOP
+    Drone    = STOP
+    Rover    = STOP
+
+
+Timeline:
+
+    0 s
+     │
+     ▼
+    Start camera recording
+     │
+     ▼
+    Keep all robots stopped
+     │
+     │
+     │    Unreal Level Sequencer
+     │    is running
+     │
+     │
+    800 s
+     │
+     ▼
+    Sequencer completed
+     │
+     ▼
+    Start all robot missions simultaneously
+     │
+     ▼
+    Record onboard cameras
+     │
+     ▼
+    Missions complete
+     │
+     ▼
     Stop all robots
-          ↓
+     │
+     ▼
     Save video
-          ↓
+     │
+     ▼
     Terminate
 
 
-VIDEO FORMAT:
+IMPORTANT:
+The 800-second wait is a synchronization time between this ROS 2 node and
+the Unreal Level Sequencer.
 
-    MP4
+If the Level Sequence duration is changed later, update:
 
-VIDEO LAYOUT:
+    SEQUENCER_DURATION_SECONDS
+
+below.
+
+
+===============================================================================
+10. VIDEO RECORDING
+===============================================================================
+
+The Python node receives all three onboard camera streams through ROS 2.
+
+The video layout is:
 
     ┌──────────────┬──────────────┐
     │   BlueBoat   │    Drone     │
@@ -296,13 +340,22 @@ VIDEO LAYOUT:
     └──────────────┴──────────────┘
 
 
+The onboard-camera video resolution is:
+
+    1280 × 720
+
+
+This is produced from four 640 × 360 panels.
+
+
 ===============================================================================
-10. VIDEO OUTPUT
+11. VIDEO OUTPUT
 ===============================================================================
 
-The video is saved to:
+Directory:
 
     BlueSim/ros2_ws/Recorded Videos/
+
 
 Filename:
 
@@ -310,21 +363,17 @@ Filename:
 
 
 ===============================================================================
-11. CONTROL RATE
+12. CONTROL RATE
 ===============================================================================
 
 Robot command publication:
 
     20 Hz
 
+
 Video:
 
     5 FPS
-
-The video uses the latest frame received from each camera.
-
-This is important because the three cameras may not publish at exactly the
-same frequency.
 
 
 ===============================================================================
@@ -351,9 +400,35 @@ COMMAND_RATE_HZ = 20.0
 
 VIDEO_FPS = 5.0
 
-PRE_ROLL_DURATION = 2.0
 
-POST_ROLL_DURATION = 1.0
+# =============================================================================
+# LEVEL SEQUENCER SYNCHRONIZATION
+# =============================================================================
+#
+# IMPORTANT:
+#
+# This MUST match the End time of LS_BlueSim_Showcase.
+#
+# Current Unreal Sequencer:
+#
+#     Start = 0
+#     End   = 800
+#
+# Therefore:
+#
+
+SEQUENCER_DURATION_SECONDS = 27.0
+
+#
+# If you later change the Sequencer End time to 600:
+#
+#     SEQUENCER_DURATION_SECONDS = 600.0
+#
+# If you later change it to 900:
+#
+#     SEQUENCER_DURATION_SECONDS = 900.0
+#
+# =============================================================================
 
 
 # =============================================================================
@@ -600,9 +675,7 @@ class BlueSimMultiRobotExperiment(Node):
         # =====================================================================
 
         self.blueboat_frame: Optional[np.ndarray] = None
-
         self.drone_frame: Optional[np.ndarray] = None
-
         self.rover_frame: Optional[np.ndarray] = None
 
         # =====================================================================
@@ -625,11 +698,14 @@ class BlueSimMultiRobotExperiment(Node):
 
         self.shutdown_requested = False
 
-        self.pre_roll_start_time = None
+        # Time at which the onboard recording started.
+        self.recording_start_time = None
 
+        # Time at which the robot missions begin.
         self.mission_start_time = None
 
-        self.post_roll_start_time = None
+        # Time at which the robot missions complete.
+        self.mission_finished_time = None
 
         # =====================================================================
         # MISSIONS
@@ -733,12 +809,22 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         self.get_logger().info(
+            f"Sequencer wait   : "
+            f"{SEQUENCER_DURATION_SECONDS:.1f} seconds"
+        )
+
+        self.get_logger().info(
+            f"Mission duration : "
+            f"{self.total_mission_duration:.1f} seconds"
+        )
+
+        self.get_logger().info(
             "Waiting for valid frames from all "
             "three cameras..."
         )
 
     # =========================================================================
-    # TWIST HELPERS
+    # TWIST HELPER
     # =========================================================================
 
     @staticmethod
@@ -784,7 +870,9 @@ class BlueSimMultiRobotExperiment(Node):
 
                 channels = 3
 
-                row_size = msg.width * channels
+                row_size = (
+                    msg.width * channels
+                )
 
                 raw = np.frombuffer(
                     msg.data,
@@ -821,7 +909,9 @@ class BlueSimMultiRobotExperiment(Node):
 
                 channels = 3
 
-                row_size = msg.width * channels
+                row_size = (
+                    msg.width * channels
+                )
 
                 raw = np.frombuffer(
                     msg.data,
@@ -970,9 +1060,11 @@ class BlueSimMultiRobotExperiment(Node):
     def start_recording(self):
 
         if self.recording_started:
+
             return
 
         if not self.all_cameras_ready():
+
             return
 
         VIDEO_DIRECTORY.mkdir(
@@ -981,21 +1073,19 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # =====================================================================
-        # Normalize all cameras to 640x360.
+        # All camera panels are normalized to 640x360.
         # =====================================================================
 
         target_width = 640
         target_height = 360
 
         # =====================================================================
-        # Composite video:
+        # Composite:
         #
         # BlueBoat | Drone
         # Rover    | Status
         #
-        # Final:
-        #
-        # 1280 x 720
+        # Final = 1280x720
         # =====================================================================
 
         video_width = target_width * 2
@@ -1024,10 +1114,10 @@ class BlueSimMultiRobotExperiment(Node):
 
         self.recording_started = True
 
-        self.pre_roll_start_time = time.monotonic()
+        self.recording_start_time = time.monotonic()
 
         self.get_logger().info(
-            "Video recording started."
+            "Onboard camera recording started."
         )
 
         self.get_logger().info(
@@ -1041,8 +1131,13 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         self.get_logger().info(
-            f"Pre-roll: "
-            f"{PRE_ROLL_DURATION:.1f} seconds"
+            "All robots will remain STOPPED "
+            "until the Unreal Sequencer completes."
+        )
+
+        self.get_logger().info(
+            f"Waiting {SEQUENCER_DURATION_SECONDS:.1f} "
+            f"seconds for the Level Sequencer..."
         )
 
     # =========================================================================
@@ -1171,7 +1266,7 @@ class BlueSimMultiRobotExperiment(Node):
         self.rover_publisher.publish(msg)
 
     # =========================================================================
-    # ROBOT STOP
+    # STOP ALL ROBOTS
     # =========================================================================
 
     def stop_all_robots(self):
@@ -1182,6 +1277,10 @@ class BlueSimMultiRobotExperiment(Node):
 
         self.publish_rover_command("stop")
 
+        self.last_blueboat_command = "STOP"
+        self.last_drone_command = "STOP"
+        self.last_rover_command = "STOP"
+
     # =========================================================================
     # CONTROL LOOP
     # =========================================================================
@@ -1189,7 +1288,7 @@ class BlueSimMultiRobotExperiment(Node):
     def control_loop(self):
 
         # ---------------------------------------------------------------------
-        # Wait until cameras are ready.
+        # Cameras/video not ready yet.
         # ---------------------------------------------------------------------
 
         if not self.recording_started:
@@ -1199,30 +1298,86 @@ class BlueSimMultiRobotExperiment(Node):
             return
 
         # ---------------------------------------------------------------------
-        # Pre-roll period.
+        # IMPORTANT:
+        #
+        # The camera recording has started.
+        # The robots remain stopped for the COMPLETE Level Sequencer period.
         # ---------------------------------------------------------------------
 
         if not self.experiment_started:
 
             elapsed = (
                 time.monotonic()
-                - self.pre_roll_start_time
+                - self.recording_start_time
             )
 
             self.stop_all_robots()
 
-            if elapsed >= PRE_ROLL_DURATION:
+            remaining = (
+                SEQUENCER_DURATION_SECONDS
+                - elapsed
+            )
+
+            # -------------------------------------------------------------
+            # Print a useful status message approximately every 10 seconds.
+            # -------------------------------------------------------------
+
+            if (
+                remaining > 0.0
+                and (
+                    int(elapsed) % 10 == 0
+                )
+            ):
+
+                # Avoid flooding the terminal by only logging when the
+                # integer second changes.
+                if not hasattr(
+                    self,
+                    "_last_wait_log_second",
+                ):
+
+                    self._last_wait_log_second = -1
+
+                current_second = int(elapsed)
+
+                if (
+                    current_second
+                    != self._last_wait_log_second
+                    and current_second % 10 == 0
+                ):
+
+                    self._last_wait_log_second = (
+                        current_second
+                    )
+
+                    self.get_logger().info(
+                        f"Waiting for Sequencer: "
+                        f"{remaining:.0f} s remaining."
+                    )
+
+            # -------------------------------------------------------------
+            # Sequencer completed.
+            # -------------------------------------------------------------
+
+            if elapsed >= SEQUENCER_DURATION_SECONDS:
 
                 self.experiment_started = True
 
-                self.mission_start_time = time.monotonic()
+                self.mission_start_time = (
+                    time.monotonic()
+                )
 
                 self.get_logger().info(
                     "=================================================="
                 )
 
                 self.get_logger().info(
-                    "Starting all three robot missions."
+                    "UNREAL SEQUENCER COMPLETED."
+                )
+
+                self.get_logger().info(
+                    "Starting all three robot missions "
+                    "SIMULTANEOUSLY."
                 )
 
                 self.get_logger().info(
@@ -1232,12 +1387,14 @@ class BlueSimMultiRobotExperiment(Node):
 
                 self.get_logger().info(
                     "Drone: "
-                    "ELEVATE → FORWARD → YAW LEFT → FORWARD"
+                    "ELEVATE → FORWARD → "
+                    "YAW LEFT → FORWARD"
                 )
 
                 self.get_logger().info(
                     "Rover: "
-                    "RIGHT → FORWARD → LEFT → FORWARD"
+                    "RIGHT → FORWARD → "
+                    "LEFT → FORWARD"
                 )
 
                 self.get_logger().info(
@@ -1247,7 +1404,7 @@ class BlueSimMultiRobotExperiment(Node):
             return
 
         # ---------------------------------------------------------------------
-        # Experiment already finished.
+        # Mission finished.
         # ---------------------------------------------------------------------
 
         if self.experiment_finished:
@@ -1266,7 +1423,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Get current command for each robot.
+        # Current command for each robot.
         # ---------------------------------------------------------------------
 
         blueboat_command = (
@@ -1289,6 +1446,9 @@ class BlueSimMultiRobotExperiment(Node):
 
         # ---------------------------------------------------------------------
         # Publish commands.
+        #
+        # Because all three are evaluated from the SAME elapsed time,
+        # they start together.
         # ---------------------------------------------------------------------
 
         self.publish_blueboat_command(
@@ -1304,7 +1464,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Store commands for video status display.
+        # Save command names for the video status panel.
         # ---------------------------------------------------------------------
 
         self.last_blueboat_command = (
@@ -1320,14 +1480,14 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Check whether all missions are complete.
+        # Check mission completion.
         # ---------------------------------------------------------------------
 
         if elapsed >= self.total_mission_duration:
 
             self.experiment_finished = True
 
-            self.post_roll_start_time = (
+            self.mission_finished_time = (
                 time.monotonic()
             )
 
@@ -1342,7 +1502,7 @@ class BlueSimMultiRobotExperiment(Node):
     def video_loop(self):
 
         # ---------------------------------------------------------------------
-        # Start recording once all cameras are ready.
+        # Start recording as soon as all cameras are available.
         # ---------------------------------------------------------------------
 
         if not self.recording_started:
@@ -1354,7 +1514,7 @@ class BlueSimMultiRobotExperiment(Node):
             return
 
         # ---------------------------------------------------------------------
-        # Need all frames.
+        # All three camera frames are required for the composite video.
         # ---------------------------------------------------------------------
 
         if not self.all_cameras_ready():
@@ -1362,7 +1522,7 @@ class BlueSimMultiRobotExperiment(Node):
             return
 
         # ---------------------------------------------------------------------
-        # Prepare frames.
+        # Resize cameras to 640x360.
         # ---------------------------------------------------------------------
 
         blueboat = cv2.resize(
@@ -1384,7 +1544,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Add labels.
+        # Camera labels.
         # ---------------------------------------------------------------------
 
         cv2.putText(
@@ -1452,10 +1612,40 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Time information.
+        # Status / time.
         # ---------------------------------------------------------------------
 
-        if (
+        if not self.experiment_started:
+
+            elapsed = 0.0
+
+            if self.recording_start_time is not None:
+
+                elapsed = (
+                    time.monotonic()
+                    - self.recording_start_time
+                )
+
+            remaining = max(
+                0.0,
+                SEQUENCER_DURATION_SECONDS
+                - elapsed,
+            )
+
+            phase = "SEQUENCER"
+
+            cv2.putText(
+                status,
+                f"Sequencer: {remaining:.0f}s",
+                (30, 145),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+
+        elif (
             self.experiment_started
             and not self.experiment_finished
         ):
@@ -1467,30 +1657,31 @@ class BlueSimMultiRobotExperiment(Node):
 
             phase = "RUNNING"
 
-        elif not self.experiment_started:
-
-            elapsed = 0.0
-
-            phase = "PRE-ROLL"
+            cv2.putText(
+                status,
+                f"Mission: {elapsed:.1f}s",
+                (30, 145),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
 
         else:
 
-            elapsed = (
-                self.total_mission_duration
-            )
-
             phase = "COMPLETED"
 
-        cv2.putText(
-            status,
-            f"Time: {elapsed:.1f} s",
-            (30, 145),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
+            cv2.putText(
+                status,
+                "Mission completed",
+                (30, 145),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
 
         cv2.putText(
             status,
@@ -1552,7 +1743,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Build composite frame.
+        # Build 2x2 video.
         # ---------------------------------------------------------------------
 
         top_row = np.hstack(
@@ -1577,32 +1768,16 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Write frame.
+        # Write video frame.
         # ---------------------------------------------------------------------
 
-        self.video_writer.write(
-            composite
-        )
+        if self.video_writer is not None:
 
-        self.video_frame_count += 1
-
-        # ---------------------------------------------------------------------
-        # Finish after post-roll.
-        # ---------------------------------------------------------------------
-
-        if self.experiment_finished:
-
-            post_roll_elapsed = (
-                time.monotonic()
-                - self.post_roll_start_time
+            self.video_writer.write(
+                composite
             )
 
-            if (
-                post_roll_elapsed
-                >= POST_ROLL_DURATION
-            ):
-
-                self.finish_experiment()
+            self.video_frame_count += 1
 
     # =========================================================================
     # FINISH EXPERIMENT
@@ -1610,12 +1785,13 @@ class BlueSimMultiRobotExperiment(Node):
 
     def finish_experiment(self):
 
-        if self.experiment_finished is False:
+        # Prevent repeated finalization.
+        if self.shutdown_requested:
 
-            self.experiment_finished = True
+            return
 
         # ---------------------------------------------------------------------
-        # Stop all robots.
+        # Stop all robots FIRST.
         # ---------------------------------------------------------------------
 
         self.stop_all_robots()
@@ -1625,7 +1801,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Stop control timer.
+        # Cancel control timer.
         # ---------------------------------------------------------------------
 
         if self.control_timer is not None:
@@ -1633,7 +1809,7 @@ class BlueSimMultiRobotExperiment(Node):
             self.control_timer.cancel()
 
         # ---------------------------------------------------------------------
-        # Stop video timer.
+        # Cancel video timer.
         # ---------------------------------------------------------------------
 
         if self.video_timer is not None:
@@ -1641,7 +1817,7 @@ class BlueSimMultiRobotExperiment(Node):
             self.video_timer.cancel()
 
         # ---------------------------------------------------------------------
-        # Release video writer.
+        # Release video.
         # ---------------------------------------------------------------------
 
         if self.video_writer is not None:
@@ -1671,7 +1847,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
         # ---------------------------------------------------------------------
-        # Clean ROS shutdown.
+        # Request clean ROS shutdown.
         # ---------------------------------------------------------------------
 
         self.shutdown_timer = self.create_timer(
@@ -1680,7 +1856,7 @@ class BlueSimMultiRobotExperiment(Node):
         )
 
     # =========================================================================
-    # SHUTDOWN
+    # ROS SHUTDOWN
     # =========================================================================
 
     def shutdown_callback(self):
@@ -1706,7 +1882,7 @@ class BlueSimMultiRobotExperiment(Node):
     def destroy_node(self):
 
         # ---------------------------------------------------------------------
-        # Safety stop.
+        # Always attempt to stop all robots.
         # ---------------------------------------------------------------------
 
         try:
@@ -1718,7 +1894,7 @@ class BlueSimMultiRobotExperiment(Node):
             pass
 
         # ---------------------------------------------------------------------
-        # Finalize video if interrupted.
+        # Finalize video if Ctrl+C occurs.
         # ---------------------------------------------------------------------
 
         if self.video_writer is not None:

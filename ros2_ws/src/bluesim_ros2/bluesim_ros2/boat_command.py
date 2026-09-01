@@ -55,23 +55,23 @@ The current BlueBoat Unreal Engine control system uses the following
 ROS 2 command convention:
 
     linear.x = +1.0
-        → Move FORWARD
+         Move FORWARD
 
     linear.x = -1.0
-        → Move BACKWARD
+         Move BACKWARD
 
     linear.x = 0.0
-        → No forward/backward driving force
+         No forward/backward driving force
 
 
     angular.z = +1.0
-        → Turn RIGHT
+         Turn RIGHT
 
     angular.z = -1.0
-        → Turn LEFT
+         Turn LEFT
 
     angular.z = 0.0
-        → No turning command
+         No turning command
 
 
 IMPORTANT
@@ -89,12 +89,12 @@ Blueprint into force and torque.
 For example:
 
     linear.x = 1.0
-        → positive BoatThrottle
-        → forward force
+         positive BoatThrottle
+         forward force
 
     angular.z = 1.0
-        → positive BoatSteering
-        → right turn
+         positive BoatSteering
+         right turn
 
 The exact distance travelled and angle turned therefore depend on the
 current Unreal physics configuration and command duration.
@@ -128,13 +128,13 @@ Each command has this format:
 Examples:
 
     ("forward", 10.0)
-        → Move forward for 10 seconds.
+         Move forward for 10 seconds.
 
     ("backward", 5.0)
-        → Move backward for 5 seconds.
+         Move backward for 5 seconds.
 
     ("turn_right", 4.0)
-        → Turn right for 4 seconds.
+         Turn right for 4 seconds.
 
 
 ===============================================================================
